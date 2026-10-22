@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>JARVIS MR - Ground-Leveled Holographic OS</title>
+  <title>JARVIS MR - Mark XIII HUD OS</title>
   <style>
     :root {
       --primary: #00f0ff;
       --primary-glow: rgba(0, 240, 255, 0.6);
       --secondary: #ffb700;
-      --panel-bg: rgba(6, 18, 36, 0.85);
-      --panel-border: rgba(0, 240, 255, 0.4);
+      --panel-bg: rgba(6, 18, 36, 0.9);
+      --panel-border: rgba(0, 240, 255, 0.5);
       --font-mono: 'Consolas', 'Courier New', monospace;
     }
 
@@ -41,26 +41,25 @@
       align-items: center;
       justify-content: center;
       gap: 20px;
-      transition: opacity 0.4s ease;
     }
 
     .launcher-card {
       background: var(--panel-bg);
       border: 1px solid var(--primary);
-      padding: 30px 40px;
-      border-radius: 14px;
+      padding: 35px 45px;
+      border-radius: 16px;
       text-align: center;
-      box-shadow: 0 0 40px var(--primary-glow);
-      backdrop-filter: blur(15px);
-      max-width: 450px;
+      box-shadow: 0 0 50px var(--primary-glow);
+      backdrop-filter: blur(20px);
+      max-width: 460px;
     }
 
     h1 {
       font-family: var(--font-mono);
-      font-size: 1.5rem;
+      font-size: 1.6rem;
       letter-spacing: 3px;
       color: #fff;
-      margin-bottom: 10px;
+      margin-bottom: 12px;
     }
 
     h1 span { color: var(--primary); }
@@ -69,11 +68,11 @@
       font-size: 0.9rem;
       color: #a0c0d0;
       margin-bottom: 25px;
-      line-height: 1.4;
+      line-height: 1.5;
     }
 
     .launch-btn {
-      background: linear-gradient(135deg, rgba(0,240,255,0.2), rgba(0,240,255,0.4));
+      background: linear-gradient(135deg, rgba(0,240,255,0.25), rgba(0,240,255,0.5));
       border: 2px solid var(--primary);
       color: #fff;
       padding: 14px 28px;
@@ -83,17 +82,23 @@
       font-weight: bold;
       letter-spacing: 1px;
       cursor: pointer;
-      box-shadow: 0 0 20px var(--primary-glow);
+      box-shadow: 0 0 25px var(--primary-glow);
       transition: all 0.2s ease;
       width: 100%;
-      margin-top: 10px;
     }
 
     .launch-btn:hover {
       background: var(--primary);
       color: #000;
-      box-shadow: 0 0 30px var(--primary);
-      transform: scale(1.02);
+      box-shadow: 0 0 35px var(--primary);
+    }
+
+    #error-log {
+      margin-top: 15px;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: #ff4444;
+      word-break: break-all;
     }
   </style>
 
@@ -106,8 +111,9 @@
   <div id="launch-overlay">
     <div class="launcher-card">
       <h1>JARVIS <span>MR OS</span></h1>
-      <p>Mark XI Mixed Reality Environment. Ground-leveled spatial tracking, voice parser, and holographic spawner.</p>
+      <p>Mark XIII Mixed Reality Environment. Pull your Quest controller trigger inside VR to spawn holograms and interact with the HUD.</p>
       <button class="launch-btn" id="launch-vr-btn">LAUNCH PASSTHROUGH AR</button>
+      <div id="error-log"></div>
     </div>
   </div>
 
@@ -116,4 +122,121 @@
   <script>
     let camera, scene, renderer, xrSession = null;
     let hudGroup, speechBubbleMesh, speechTexture, speechCtx, speechCanvas;
-    let holograms
+    let holograms = [];
+    let controller1, controller2;
+
+    document.getElementById('launch-vr-btn').addEventListener('click', () => {
+      const logEl = document.getElementById('error-log');
+      logEl.innerText = "Initializing WebXR...";
+
+      if (!navigator.xr) {
+        logEl.innerText = "ERROR: WebXR not supported in this browser. Ensure you use HTTPS.";
+        return;
+      }
+
+      navigator.xr.isSessionSupported('immersive-ar').then((supported) => {
+        if (supported) {
+          navigator.xr.requestSession('immersive-ar', {
+            requiredFeatures: ['local-floor'],
+            optionalFeatures: ['hit-test', 'hand-tracking']
+          }).then(onSessionStarted).catch((err) => {
+            logEl.innerText = "Session Error: " + err.message;
+          });
+        } else {
+          logEl.innerText = "immersive-ar not supported on this device.";
+        }
+      }).catch((err) => {
+        logEl.innerText = "XR Check Error: " + err.message;
+      });
+    });
+
+    function onSessionStarted(session) {
+      xrSession = session;
+      document.getElementById('launch-overlay').style.display = 'none';
+
+      scene = new THREE.Scene();
+      camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
+
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.xr.enabled = true;
+      document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+      // Lighting
+      const ambientLight = new THREE.AmbientLight(0xffffff, 1.3);
+      scene.add(ambientLight);
+
+      const dirLight = new THREE.DirectionalLight(0x00f0ff, 3.0);
+      dirLight.position.set(1, 3, 2);
+      scene.add(dirLight);
+
+      // Head-Locked HUD Group
+      hudGroup = new THREE.Group();
+      camera.add(hudGroup);
+      scene.add(camera);
+
+      buildWorkingHUD();
+
+      // Setup Quest Controllers (Pull Trigger to Spawn Hologram)
+      controller1 = renderer.xr.getController(0);
+      controller1.addEventListener('select', () => {
+        spawnHologram('iron_man');
+        updateHUDStatus("Arc Reactor Hologram Deployed.");
+      });
+      scene.add(controller1);
+
+      controller2 = renderer.xr.getController(1);
+      controller2.addEventListener('select', () => {
+        clearHolograms();
+        updateHUDStatus("Holographic Field Cleared.");
+      });
+      scene.add(controller2);
+
+      session.addEventListener('end', () => {
+        xrSession = null;
+        document.getElementById('launch-overlay').style.display = 'flex';
+      });
+
+      renderer.setAnimationLoop(render);
+    }
+
+    // --- Fully Working HUD ---
+    function buildWorkingHUD() {
+      // 1. Arc Reactor Core Widget (Center Bottom)
+      const ringGeo = new THREE.RingGeometry(0.1, 0.13, 32);
+      const ringMat = new THREE.MeshBasicMaterial({ color: 0x00f0ff, side: THREE.DoubleSide, wireframe: true });
+      const arcCore = new THREE.Mesh(ringGeo, ringMat);
+      arcCore.position.set(0, -0.3, -0.9);
+      hudGroup.add(arcCore);
+
+      // 2. HUD Status Banner (Upper View)
+      speechCanvas = document.createElement('canvas');
+      speechCanvas.width = 512;
+      speechCanvas.height = 128;
+      speechCtx = speechCanvas.getContext('2d');
+      
+      updateHUDStatus("JARVIS v13 Active. Pull Trigger to Spawn.");
+
+      speechTexture = new THREE.CanvasTexture(speechCanvas);
+      const speechGeo = new THREE.PlaneGeometry(0.75, 0.18);
+      const speechMat = new THREE.MeshBasicMaterial({ map: speechTexture, transparent: true, side: THREE.DoubleSide });
+      speechBubbleMesh = new THREE.Mesh(speechGeo, speechMat);
+      speechBubbleMesh.position.set(0, 0.35, -0.9);
+      hudGroup.add(speechBubbleMesh);
+    }
+
+    function updateHUDStatus(text) {
+      if (!speechCtx) return;
+      speechCtx.clearRect(0, 0, 512, 128);
+      
+      speechCtx.fillStyle = 'rgba(6, 18, 36, 0.9)';
+      speechCtx.strokeStyle = '#00f0ff';
+      speechCtx.lineWidth = 5;
+      speechCtx.beginPath();
+      speechCtx.roundRect(4, 4, 504, 120, 12);
+      speechCtx.fill();
+      speechCtx.stroke();
+
+      speechCtx.fillStyle = '#00f0ff';
+      speechCtx.font = 'bold 20px Consolas, monospace';
+      speechCtx.textAlign = 'center';
