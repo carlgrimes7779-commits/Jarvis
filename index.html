@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JARVIS MR - Ground-Leveled Holographic OS</title>
+  <style>
+    :root {
+      --primary: #00f0ff;
+      --primary-glow: rgba(0, 240, 255, 0.6);
+      --secondary: #ffb700;
+      --panel-bg: rgba(6, 18, 36, 0.85);
+      --panel-border: rgba(0, 240, 255, 0.4);
+      --font-mono: 'Consolas', 'Courier New', monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+
+    body {
+      background-color: #000;
+      color: var(--primary);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    #canvas-container {
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      z-index: 1;
+    }
+
+    #launch-overlay {
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      z-index: 100;
+      background: radial-gradient(circle at center, #05101f 0%, #010408 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      transition: opacity 0.4s ease;
+    }
+
+    .launcher-card {
+      background: var(--panel-bg);
+      border: 1px solid var(--primary);
+      padding: 30px 40px;
+      border-radius: 14px;
+      text-align: center;
+      box-shadow: 0 0 40px var(--primary-glow);
+      backdrop-filter: blur(15px);
+      max-width: 450px;
+    }
+
+    h1 {
+      font-family: var(--font-mono);
+      font-size: 1.5rem;
+      letter-spacing: 3px;
+      color: #fff;
+      margin-bottom: 10px;
+    }
+
+    h1 span { color: var(--primary); }
+
+    p {
+      font-size: 0.9rem;
+      color: #a0c0d0;
+      margin-bottom: 25px;
+      line-height: 1.4;
+    }
+
+    .launch-btn {
+      background: linear-gradient(135deg, rgba(0,240,255,0.2), rgba(0,240,255,0.4));
+      border: 2px solid var(--primary);
+      color: #fff;
+      padding: 14px 28px;
+      border-radius: 8px;
+      font-family: var(--font-mono);
+      font-size: 1rem;
+      font-weight: bold;
+      letter-spacing: 1px;
+      cursor: pointer;
+      box-shadow: 0 0 20px var(--primary-glow);
+      transition: all 0.2s ease;
+      width: 100%;
+      margin-top: 10px;
+    }
+
+    .launch-btn:hover {
+      background: var(--primary);
+      color: #000;
+      box-shadow: 0 0 30px var(--primary);
+      transform: scale(1.02);
+    }
+  </style>
+
+  <!-- Three.js CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+
+  <!-- Launch Screen -->
+  <div id="launch-overlay">
+    <div class="launcher-card">
+      <h1>JARVIS <span>MR OS</span></h1>
+      <p>Mark XI Mixed Reality Environment. Ground-leveled spatial tracking, voice parser, and holographic spawner.</p>
+      <button class="launch-btn" id="launch-vr-btn">LAUNCH PASSTHROUGH AR</button>
+    </div>
+  </div>
+
+  <div id="canvas-container"></div>
+
+  <script>
+    let camera, scene, renderer, xrSession = null;
+    let hudGroup, speechBubbleMesh, speechTexture, speechCtx, speechCanvas;
+    let holograms
